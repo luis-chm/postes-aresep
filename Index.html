@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Postes · ARESEP</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+<style>
+  :root{
+    --bg:#12161b;
+    --panel:#181e25;
+    --panel-2:#1e2630;
+    --border:#262e38;
+    --text:#e7ebef;
+    --muted:#7c8896;
+    --accent:#f5c518;
+    --accent-dim:#8a751c;
+    --danger:#e5484d;
+    --overlay-bg: rgba(24,30,37,.92);
+    --mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);}
+  #app{display:flex;flex-direction:column;height:100%;}
+
+  header{
+    padding:14px 18px;
+    background:var(--panel);
+    border-bottom:1px solid var(--border);
+    display:flex;
+    align-items:center;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  .brand{display:flex;flex-direction:column;gap:2px;min-width:180px;}
+  .brand .eyebrow{
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--accent);
+  }
+  .brand h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.01em;}
+  .brand p{margin:0;font-size:11px;color:var(--muted);font-family:var(--mono);}
+
+  .search{display:flex;gap:8px;align-items:center;flex:1;min-width:260px;}
+  .search input{
+    flex:1;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    font-family:var(--mono);
+    font-size:13px;
+    padding:9px 12px;
+    border-radius:4px;
+    text-transform:uppercase;
+    outline:none;
+  }
+  .search input:focus{border-color:var(--accent);}
+  .search input::placeholder{color:var(--muted);text-transform:none;}
+  .search button{
+    background:var(--accent);
+    color:#1a1500;
+    border:none;
+    font-family:var(--mono);
+    font-weight:700;
+    font-size:12px;
+    letter-spacing:.04em;
+    padding:9px 16px;
+    border-radius:4px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .search button:hover{filter:brightness(1.08);}
+  .search button:disabled{opacity:.5;cursor:default;}
+  .search button.ghost{background:transparent;color:var(--muted);border:1px solid var(--border);}
+  .search button.ghost:hover{color:var(--text);border-color:var(--muted);}
+  .accumulate{
+    display:flex;align-items:center;gap:6px;
+    font-family:var(--mono);font-size:11px;color:var(--muted);
+    white-space:nowrap;
+  }
+  .accumulate input{accent-color:var(--accent);}
+
+  .status{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--muted);
+    min-width:120px;
+    text-align:right;
+  }
+
+  main{position:relative;flex:1;min-height:0;}
+  body.light{
+    --bg:#f6f5f1;
+    --panel:#ffffff;
+    --panel-2:#f0eee8;
+    --border:#dcd8cf;
+    --text:#1c1f24;
+    --muted:#6b7280;
+    --accent-dim:#8a6d00;
+    --overlay-bg: rgba(255,255,255,.92);
+  }
+  body.light #map .leaflet-tile-pane{ filter:none; }
+  body.light #map{ background:#e5e3dc; }
+  #map{position:absolute;inset:0;background:#0d1116;}
+  #map .leaflet-tile-pane{
+    filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9) saturate(0.6);
+  }
+
+  .overlay{
+    position:absolute;
+    background:var(--overlay-bg);
+    border:1px solid var(--border);
+    border-radius:6px;
+    backdrop-filter:blur(4px);
+    font-family:var(--mono);
+    z-index:500;
+  }
+  #legend{
+    top:14px;
+    right:14px;
+    padding:10px 12px;
+    max-width:190px;
+    font-size:11px;
+  }
+  #legend h2{margin:0 0 8px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;}
+  .legend-row{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;user-select:none;}
+  .legend-row input{accent-color:var(--accent);}
+  .swatch{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .legend-name{flex:1;color:var(--text);}
+  .legend-count{color:var(--muted);}
+
+  #coords{
+    left:14px;
+    bottom:14px;
+    padding:8px 12px;
+    font-size:11px;
+    color:var(--muted);
+    display:flex;
+    gap:16px;
+  }
+  #coords .k{color:var(--accent-dim);}
+  #coords .v{color:var(--text);}
+
+  #empty, #error{
+    position:absolute;inset:0;
+    display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:10px;
+    text-align:center;padding:40px;
+    z-index:400;
+  }
+  #empty h2, #error h2{font-size:16px;margin:0;font-weight:600;}
+  #empty p, #error p{margin:0;color:var(--muted);font-size:13px;max-width:420px;line-height:1.5;}
+  #empty .hint{font-family:var(--mono);font-size:11px;color:var(--accent-dim);}
+  #error h2{color:var(--danger);}
+  #error a{color:var(--accent);text-decoration:none;font-family:var(--mono);font-size:12px;border-bottom:1px dotted var(--accent);}
+  #empty, #error{display:none;}
+
+  .leaflet-popup-content-wrapper{
+    background:var(--panel-2);
+    color:var(--text);
+    border:1px solid var(--border);
+    border-radius:6px;
+  }
+  .leaflet-popup-tip{background:var(--panel-2);}
+  .popup-op{font-family:var(--mono);font-weight:700;font-size:12px;}
+  .popup-loc{font-size:11px;color:var(--muted);margin-top:2px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">
+      <span class="eyebrow">Datos abiertos</span>
+      <h1>Postes · ARESEP</h1>
+      <p>Consulta directa a la API, sin pasar por el visor</p>
+    </div>
+    <div class="search">
+      <input id="districtInput" type="text" placeholder="Distrito (EL CARMEN) o coordenadas WGS84 (9.87034, -84.5884)" autocomplete="off">
+      <button id="searchBtn">Buscar postes</button>
+      <label class="accumulate"><input type="checkbox" id="accumulate"> agregar al mapa</label>
+      <button id="themeBtn" class="ghost" title="Cambiar tema">☾ Oscuro</button>
+    </div>
+    <div class="status" id="statusText"></div>
+  </header>
+  <main>
+    <div id="map"></div>
+    <div id="empty">
+      <h2>Sin datos cargados</h2>
+      <p>Escribí el nombre de un distrito de Costa Rica (en mayúsculas, tal como aparece en la división territorial) o unas coordenadas WGS84 separadas por coma, y presioná Buscar. Los datos vienen directo de la API de datos abiertos de ARESEP.</p>
+      <span class="hint">ej: EL CARMEN · PAVAS &nbsp;·&nbsp; 9.87034, -84.5884</span>
+    </div>
+    <div id="error">
+      <h2>No se pudo cargar el distrito</h2>
+      <p id="errorDetail">La API de ARESEP no respondió, o el navegador bloqueó la solicitud entre dominios (CORS).</p>
+      <a id="rawLink" href="#" target="_blank">Abrir los datos crudos en una pestaña nueva ↗</a>
+    </div>
+    <div class="overlay" id="legend" style="display:none;">
+      <h2>Operadores</h2>
+      <div id="legendList"></div>
+    </div>
+    <div class="overlay" id="coords">
+      <span><span class="k">CRTM05</span> <span class="v" id="crtmVal">—</span></span>
+      <span><span class="k">WGS84</span> <span class="v" id="wgsVal">—</span></span>
+    </div>
+  </main>
+</div>
+
+<script>
+proj4.defs("EPSG:5367", "+proj=tmerc +lat_0=0 +lon_0=-84 +k=0.9999 +x_0=500000 +y_0=0 +ellps=WGS84 +units=m +no_defs");
+
+const OP_COLORS = {
+  ICE: '#f5c518', CNFL: '#e8833a', COOPELESCA: '#4caf6d',
+  COOPEGUANACASTE: '#1fb6a8', JASEC: '#4c8df5', COOPESANTOS: '#7fd1e0',
+  ESPH: '#a76cf2', COOPEALFARORUIZ: '#e15fb0'
+};
+function colorFor(op){
+  if(OP_COLORS[op]) return OP_COLORS[op];
+  let h=0; for(const c of op) h=(h*31+c.charCodeAt(0))%360;
+  return `hsl(${h},65%,60%)`;
+}
+
+const map = L.map('map',{zoomControl:false}).setView([9.75,-84.0],8);
+L.control.zoom({position:'bottomright'}).addTo(map);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'© OpenStreetMap contributors', maxZoom:19
+}).addTo(map);
+
+const layerGroups = {};
+map.on('mousemove', e=>{
+  document.getElementById('wgsVal').textContent = e.latlng.lat.toFixed(5)+', '+e.latlng.lng.toFixed(5);
+  try{
+    const [x,y] = proj4('WGS84','EPSG:5367',[e.latlng.lng, e.latlng.lat]);
+    document.getElementById('crtmVal').textContent = x.toFixed(1)+', '+y.toFixed(1);
+  }catch(err){}
+});
+
+const input = document.getElementById('districtInput');
+const btn = document.getElementById('searchBtn');
+const statusText = document.getElementById('statusText');
+const emptyEl = document.getElementById('empty');
+const errorEl = document.getElementById('error');
+
+function showState(state){
+  emptyEl.style.display = state==='empty' ? 'flex':'none';
+  errorEl.style.display = state==='error' ? 'flex':'none';
+}
+showState('empty');
+
+let totalLoaded = 0;
+const districtsLoaded = [];
+
+// Tries a direct fetch first (works if ARESEP ever allows CORS), then two
+// public CORS proxies that fetch server-side and attach the missing header.
+async function fetchJson(url){
+  const attempts = [
+    url,
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+    'https://corsproxy.io/?url=' + encodeURIComponent(url)
+  ];
+  let lastErr;
+  for(const attemptUrl of attempts){
+    try{
+      const res = await fetch(attemptUrl);
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      return await res.json();
+    }catch(err){ lastErr = err; }
+  }
+  throw lastErr;
+}
+
+function tryParseCoords(str){
+  const m = str.trim().match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+  if(!m) return null;
+  return [parseFloat(m[1]), parseFloat(m[2])];
+}
+
+function normalizeDistrict(name){
+  return name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+}
+
+async function reverseGeocodeDistrict(lat, lon){
+  try{
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=16&addressdetails=1`);
+    const data = await res.json();
+    const a = data.address || {};
+    return a.suburb || a.city_district || a.village || a.town || a.municipality || null;
+  }catch(err){ return null; }
+}
+
+let searchMarker = null;
+async function goToCoords(lat, lon){
+  if(searchMarker) map.removeLayer(searchMarker);
+  searchMarker = L.circleMarker([lat,lon], {
+    radius:9, weight:2, color:'#fff', fillColor:'#f5c518', fillOpacity:1
+  }).addTo(map);
+  const [x,y] = proj4('WGS84','EPSG:5367',[lon,lat]);
+  searchMarker.bindPopup(
+    `<div class="popup-op">Coordenada buscada</div>`+
+    `<div class="popup-loc">WGS84: ${lat.toFixed(5)}, ${lon.toFixed(5)}<br>CRTM05: ${x.toFixed(1)}, ${y.toFixed(1)}</div>`
+  ).openPopup();
+  map.setView([lat,lon], 15);
+  showState(null);
+
+  statusText.textContent = 'Ubicando distrito...';
+  const guess = await reverseGeocodeDistrict(lat, lon);
+  if(!guess){
+    statusText.textContent = 'Ubicación: '+lat.toFixed(5)+', '+lon.toFixed(5)+' (no se pudo identificar el distrito)';
+    return;
+  }
+  const district = normalizeDistrict(guess);
+  statusText.textContent = 'Buscando postes en '+district+'...';
+  const url = 'https://datos.aresep.go.cr/ws.datosabiertos/Services/IE/Electricidad.svc/ObtenerInformacionPostesMapa/'+encodeURIComponent(district);
+  document.getElementById('rawLink').href = url;
+  try{
+    const json = await fetchJson(url);
+    const rows = json.value || [];
+    if(rows.length){
+      addRows(rows, district);
+      map.setView([lat,lon], 15);
+    }else{
+      statusText.textContent = 'Ubicación: '+district+' (sin postes registrados con ese nombre)';
+    }
+  }catch(err){
+    statusText.textContent = 'Ubicación: '+lat.toFixed(5)+', '+lon.toFixed(5)+' — no se pudieron cargar los postes de '+district;
+  }
+}
+
+async function search(){
+  const raw = input.value.trim();
+  if(!raw) return;
+  const coords = tryParseCoords(raw);
+  if(coords){
+    btn.disabled = true;
+    await goToCoords(coords[0], coords[1]);
+    btn.disabled = false;
+    return;
+  }
+
+  const district = raw.toUpperCase();
+  btn.disabled = true;
+  statusText.textContent = 'Consultando...';
+  showState(null);
+
+  const url = 'https://datos.aresep.go.cr/ws.datosabiertos/Services/IE/Electricidad.svc/ObtenerInformacionPostesMapa/'+encodeURIComponent(district);
+  document.getElementById('rawLink').href = url;
+
+  try{
+    const json = await fetchJson(url);
+    const rows = json.value || [];
+    if(!rows.length){
+      document.getElementById('errorDetail').textContent = 'La API respondió, pero no hay postes registrados para "'+district+'". Revisá la ortografía del distrito.';
+      showState('error');
+      statusText.textContent = '';
+      btn.disabled = false;
+      return;
+    }
+    addRows(rows, district);
+  }catch(err){
+    document.getElementById('errorDetail').textContent =
+      'La API de ARESEP no respondió, ni directo ni a través de los servicios que evitan el bloqueo entre dominios. Probá de nuevo en un momento.';
+    showState('error');
+    statusText.textContent = '';
+  }
+  btn.disabled = false;
+}
+
+function addRows(rows, label){
+  if(!document.getElementById('accumulate').checked){
+    Object.values(layerGroups).forEach(g=>map.removeLayer(g));
+    for(const k in layerGroups) delete layerGroups[k];
+    totalLoaded = 0;
+    districtsLoaded.length = 0;
+    opCounts = {};
+  }
+  render(rows);
+  districtsLoaded.push(label);
+  totalLoaded += rows.length;
+  statusText.textContent = totalLoaded + ' postes · ' + districtsLoaded.join(', ');
+}
+
+let opCounts = {};
+
+function render(rows){
+  const bounds = [];
+
+  for(const r of rows){
+    const x = parseFloat(r.coordenadaX), y = parseFloat(r.coordenadaY);
+    if(isNaN(x) || isNaN(y)) continue;
+    const [lon, lat] = proj4('EPSG:5367','WGS84',[x,y]);
+    const op = r.operador || 'N/D';
+    opCounts[op] = (opCounts[op]||0)+1;
+    if(!layerGroups[op]) layerGroups[op] = L.layerGroup().addTo(map);
+
+    L.circleMarker([lat,lon],{
+      radius:5, weight:1, color:'#0d1116', fillColor:colorFor(op), fillOpacity:.9
+    }).bindPopup(
+      `<div class="popup-op">${op}</div><div class="popup-loc">${r.distrito||''}, ${r.canton||''}, ${r.provincia||''}</div>`
+    ).addTo(layerGroups[op]);
+
+    bounds.push([lat,lon]);
+  }
+
+  if(bounds.length) map.fitBounds(bounds,{padding:[30,30]});
+  buildLegend(opCounts);
+}
+
+function buildLegend(counts){
+  const legend = document.getElementById('legend');
+  const list = document.getElementById('legendList');
+  list.innerHTML = '';
+  const ops = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
+  for(const op of ops){
+    const row = document.createElement('label');
+    row.className = 'legend-row';
+    row.innerHTML = `
+      <input type="checkbox" checked>
+      <span class="swatch" style="background:${colorFor(op)}"></span>
+      <span class="legend-name">${op}</span>
+      <span class="legend-count">${counts[op]}</span>`;
+    row.querySelector('input').addEventListener('change', e=>{
+      if(e.target.checked) map.addLayer(layerGroups[op]); else map.removeLayer(layerGroups[op]);
+    });
+    list.appendChild(row);
+  }
+  legend.style.display = ops.length ? 'block' : 'none';
+}
+
+btn.addEventListener('click', search);
+input.addEventListener('keydown', e=>{ if(e.key==='Enter') search(); });
+
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.addEventListener('click', ()=>{
+  const light = document.body.classList.toggle('light');
+  themeBtn.textContent = light ? '☀ Claro' : '☾ Oscuro';
+});
+</script>
+</body>
+</html>
