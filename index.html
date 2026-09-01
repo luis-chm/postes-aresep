@@ -254,21 +254,52 @@ showState('empty');
 let totalLoaded = 0;
 const districtsLoaded = [];
 
-// Tries a direct fetch first (works if ARESEP ever allows CORS), then two
-// public CORS proxies that fetch server-side and attach the missing header.
-async function fetchJson(url){
-  const attempts = [
-    url,
-    'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
-    'https://corsproxy.io/?url=' + encodeURIComponent(url)
-  ];
+// Tries a direct fetch first (works if ARESEP ever allows CORS), then a
+// list of public CORS proxies that fetch server-side and attach the
+// missing header. Free proxies come and go / rate-limit unpredictably,
+// so we try several, each with its own timeout, and retry the whole
+// list once if every proxy failed on the first pass.
+const CORS_PROXIES = [
+  u => u, // direct, in case ARESEP ever allows CORS
+  u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u),
+  u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+  u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+  u => 'https://thingproxy.freeboard.io/fetch/' + u,
+  u => 'https://api.allorigins.win/get?url=' + encodeURIComponent(u), // wraps in {contents:"..."}
+];
+
+async function fetchWithTimeout(url, ms){
+  const ctrl = new AbortController();
+  const t = setTimeout(()=>ctrl.abort(), ms);
+  try{
+    return await fetch(url, {signal: ctrl.signal});
+  }finally{
+    clearTimeout(t);
+  }
+}
+
+async function fetchJson(url, onAttempt){
   let lastErr;
-  for(const attemptUrl of attempts){
-    try{
-      const res = await fetch(attemptUrl);
-      if(!res.ok) throw new Error('HTTP '+res.status);
-      return await res.json();
-    }catch(err){ lastErr = err; }
+  for(let pass=0; pass<2; pass++){ // retry the whole proxy list once
+    for(const buildUrl of CORS_PROXIES){
+      const attemptUrl = buildUrl(url);
+      try{
+        if(onAttempt) onAttempt(attemptUrl);
+        const res = await fetchWithTimeout(attemptUrl, 8000);
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        const text = await res.text();
+        // allorigins /get wraps the payload as {"contents":"<json string>"}
+        try{
+          const parsed = JSON.parse(text);
+          if(parsed && typeof parsed.contents === 'string'){
+            return JSON.parse(parsed.contents);
+          }
+          return parsed;
+        }catch(parseErr){
+          throw new Error('Respuesta no era JSON válido');
+        }
+      }catch(err){ lastErr = err; }
+    }
   }
   throw lastErr;
 }
@@ -350,7 +381,10 @@ async function search(){
   document.getElementById('rawLink').href = url;
 
   try{
-    const json = await fetchJson(url);
+    const json = await fetchJson(url, (attemptUrl)=>{
+      const via = attemptUrl===url ? 'directo' : new URL(attemptUrl).hostname;
+      statusText.textContent = 'Consultando ('+via+')...';
+    });
     const rows = json.value || [];
     if(!rows.length){
       document.getElementById('errorDetail').textContent = 'La API respondió, pero no hay postes registrados para "'+district+'". Revisá la ortografía del distrito.';
