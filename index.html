@@ -259,8 +259,11 @@ const districtsLoaded = [];
 // missing header. Free proxies come and go / rate-limit unpredictably,
 // so we try several, each with its own timeout, and retry the whole
 // list once if every proxy failed on the first pass.
+const MY_WORKER = 'https://postes-aresep-proxy.luischavesmora.workers.dev/';
+
 const CORS_PROXIES = [
   u => u, // direct, in case ARESEP ever allows CORS
+  u => MY_WORKER + '?url=' + encodeURIComponent(u), // proxy propio (Cloudflare Worker) — el más confiable
   u => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u),
   u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
   u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
