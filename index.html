@@ -169,6 +169,102 @@
   .leaflet-popup-tip{background:var(--panel-2);}
   .popup-op{font-family:var(--mono);font-weight:700;font-size:12px;}
   .popup-loc{font-size:11px;color:var(--muted);margin-top:2px;}
+
+  /* Panel de distritos (árbol plegable) */
+  #districtPanel{
+    position:absolute;
+    top:0; left:0; bottom:0;
+    width:300px;
+    max-width:85vw;
+    background:var(--panel);
+    border-right:1px solid var(--border);
+    z-index:600;
+    display:flex;
+    flex-direction:column;
+    transform:translateX(-100%);
+    transition:transform .18s ease;
+  }
+  #districtPanel.open{transform:translateX(0);}
+  #districtPanel .dp-header{
+    padding:12px 14px;
+    border-bottom:1px solid var(--border);
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    flex-shrink:0;
+  }
+  #districtPanel .dp-title{
+    display:flex;align-items:center;justify-content:space-between;
+    font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+  }
+  #districtPanel .dp-title button{
+    background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;padding:0 2px;
+  }
+  #districtPanel .dp-title button:hover{color:var(--text);}
+  #districtFilter{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    color:var(--text);
+    font-family:var(--mono);
+    font-size:12px;
+    padding:7px 10px;
+    border-radius:4px;
+    outline:none;
+    box-sizing:border-box;
+  }
+  #districtFilter:focus{border-color:var(--accent);}
+  #districtTree{
+    flex:1;
+    overflow-y:auto;
+    padding:6px 8px;
+    font-size:12px;
+  }
+  #districtTree details{margin-bottom:2px;}
+  #districtTree summary{
+    cursor:pointer;
+    padding:5px 6px;
+    border-radius:4px;
+    color:var(--text);
+    font-weight:600;
+    list-style:none;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    user-select:none;
+  }
+  #districtTree summary::-webkit-details-marker{display:none;}
+  #districtTree summary:hover{background:var(--panel-2);}
+  #districtTree summary::before{content:'▸';color:var(--accent-dim);font-size:10px;transition:transform .12s;}
+  #districtTree details[open]>summary::before{transform:rotate(90deg);}
+  #districtTree .dp-provincia > summary{font-size:12px;}
+  #districtTree .dp-canton{margin-left:12px;}
+  #districtTree .dp-canton > summary{font-size:11px;font-weight:500;color:var(--muted);}
+  #districtTree .dp-canton-count{margin-left:auto;color:var(--muted);font-weight:400;font-size:10px;}
+  .dp-distrito-row{
+    display:flex;align-items:center;gap:7px;
+    margin-left:26px;
+    padding:4px 6px;
+    border-radius:4px;
+    cursor:pointer;
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--text);
+  }
+  .dp-distrito-row:hover{background:var(--panel-2);}
+  .dp-distrito-row input{accent-color:var(--accent);flex-shrink:0;}
+  .dp-distrito-row.active{color:var(--accent);}
+  .dp-hidden{display:none !important;}
+  #districtToggleBtn{position:relative;}
+  #districtToggleBtn .dp-badge{
+    position:absolute;top:-5px;right:-5px;
+    background:var(--accent);color:#1a1500;
+    font-size:9px;font-weight:700;
+    border-radius:8px;min-width:14px;height:14px;
+    display:flex;align-items:center;justify-content:center;
+    padding:0 3px;
+    font-family:var(--mono);
+  }
 </style>
 </head>
 <body>
@@ -183,11 +279,22 @@
       <input id="districtInput" type="text" placeholder="Distrito (EL CARMEN) o coordenadas WGS84 (9.87034, -84.5884)" autocomplete="off">
       <button id="searchBtn">Buscar postes</button>
       <label class="accumulate"><input type="checkbox" id="accumulate"> agregar al mapa</label>
+      <button id="districtToggleBtn" class="ghost" title="Explorar por provincia/cantón/distrito">☰ Distritos<span class="dp-badge" id="districtBadge" style="display:none;">0</span></button>
       <button id="themeBtn" class="ghost" title="Cambiar tema">☾ Oscuro</button>
     </div>
     <div class="status" id="statusText"></div>
   </header>
   <main>
+    <div id="districtPanel">
+      <div class="dp-header">
+        <div class="dp-title">
+          <span>Provincia · Cantón · Distrito</span>
+          <button id="districtCloseBtn" title="Cerrar">✕</button>
+        </div>
+        <input id="districtFilter" type="text" placeholder="Filtrar distrito o cantón...">
+      </div>
+      <div id="districtTree"></div>
+    </div>
     <div id="map"></div>
     <div id="empty">
       <h2>Sin datos cargados</h2>
@@ -211,6 +318,8 @@
 </div>
 
 <script>
+const DIVISION_TREE = {"Alajuela":{"Alajuela":["Alajuela","Carrizal","Desamparados","Garita","Guácima","Río Segundo","Sabanilla","San Antonio","San Isidro","San José","San Rafael","Sarapiquí","Tambor","Turrúcares"],"Atenas":["Atenas","Concepción","Escobal","Jesús","Mercedes","San Isidro","San José","Santa Eulalia"],"Grecia":["Bolívar","Grecia","Puente de Piedra","Río Cuarto","San Isidro","San José","San Roque","Tacares"],"Guatuso":["Buenavista","Cote","Katira","San Rafael"],"Los Chiles":["Caño Negro","El Amparo","Los Chiles","San Jorge"],"Naranjo":["Cirrí Sur","El Rosario","Naranjo","Palmitos","San Jerónimo","San José","San Juan","San Miguel"],"Orotina":["Coyolar","El Mastate","Hacienda Vieja","La Ceiba","Orotina"],"Palmares":["Buenos Aires","Candelaria","Esquipulas","La Granja","Palmares","Santiago","Zaragoza"],"Poás":["Carrillos","Sabana Redonda","San Juan","San Pedro","San Rafael"],"San Carlos":["Aguas Zarcas","Buenavista","Cutris","Florencia","La Fortuna","La Palmera","La Tigra","Monterrey","Pital","Pocosol","Quesada","Venado","Venecia"],"San Mateo":["Desmonte","Jesús María","San Mateo"],"San Ramón":["Alfaro","Concepción","Los Ángeles","Peñas Blancas","Piedades Norte","Piedades Sur","San Isidro","San Juan","San Rafael","San Ramón","Santiago","Volio","Zapotal"],"Upala":["Aguas Claras","Bijagua","Delicias","Dos Ríos","San José (Pizote)","Upala","Yoliyllal"],"Valverde Vega":["Rodríguez","San Pedro","Sarchí Norte","Sarchí Sur","Toro Amarillo"],"Zarcero":["Brisas","Guadalupe","Laguna","Palmira","Tapesco","Zapote","Zarcero"]},"Cartago":{"Alvarado":["Capellades","Cervantes","Pacayas"],"Cartago":["Aguacaliente (San Francisco)","Carmen","Corralillo","Dulce Nombre","Guadalupe (Arenilla)","Llano Grande","Occidental","Oriental","Quebradilla","San Nicolás","Tierra Blanca"],"El Guarco":["El Tejar","Patio de Agua","San Isidro","Tobosi"],"Jiménez":["Juan Viñas","Pejibaye","Tucurrique"],"La Unión":["Concepción","Dulce Nombre","Río Azul","San Diego","San Juan","San Rafael","San Ramón","Tres Ríos"],"Oreamuno":["Cipreses","Cot","Potrero Cerrado","San Rafael","Santa Rosa"],"Paraíso":["Cachí","Llanos de Santa Lucía","Orosi","Paraíso","Santiago"],"Turrialba":["Chirripó","La Isabel","La Suiza","Pavones","Peralta","Santa Cruz","Santa Rosa","Santa Teresita","Tayutic","Tres Equis","Tuis","Turrialba"]},"Guanacaste":{"Abangares":["Colorado","Juntas","San Juan","Sierra"],"Bagaces":["Bagaces","Fortuna","Mogote","Río Naranjo"],"Carrillo":["Belén","Filadelfia","Palmira","Sardinal"],"Cañas":["Bebedero","Cañas","Palmira","Porozal","San Miguel"],"Hojancha":["Hojancha","Huacas","Monte Romo","Puerto Carrillo"],"La Cruz":["Garita","La Cruz","Santa Cecilia","Santa Elena"],"Liberia":["Cañas Dulces","Curubande","Liberia","Mayorga","Nacascolo"],"Nandayure":["Bejuco","Carmona","Porvenir","San Pablo","Santa Rita","Zapotal"],"Nicoya":["Belén de Nosarita","Mansion","Nicoya","Nosara","Quebrada Honda","Samara","San Antonio"],"Santa Cruz":["Bolson","Cabo Velas","Cartagena","Cuajiniquil","Diria","Santa Cruz","Tamarindo","Tempate","Veintisiete de Abril"],"Tilarán":["Arenal","Líbano","Quebrada Grande","Santa Rosa","Tierras Morenas","Tilarán","Tronadora"]},"Heredia":{"Barva":["Barva","San José de la Montaña","San Pablo","San Pedro","San Roque","Santa Lucía"],"Belén":["La Asunción","La Ribera","San Antonio"],"Flores":["Barrantes","Llorente","San Joaquín de Flores"],"Heredia":["Heredia","Mercedes","San Francisco","Ulloa","Varablanca"],"San Isidro":["Concepción","San Francisco","San Isidro","San José"],"San Pablo":["Rincón de Sabanilla","San Pablo"],"San Rafael":["Concepción","Los Ángeles","San Josécito","San Rafael","Santiago"],"Santa Bárbara":["Jesús","Puraba","San Juan","San Pedro","Santa Bárbara","Santo Domingo"],"Santo Domingo":["Para","Paracito","San Miguel","San Vicente","Santa Rosa","Santo Domingo","Santo Tomás","Tures"],"Sarapiquí":["Cureña","Horquetas","La Virgen","Llanuras del Gaspar","Puerto Viejo"]},"Limón":{"Guácimo":["Duacari","Guácimo","Mercedes","Pocora","Río Jiménez"],"Limón":["Limón","Matama","Río Blanco","Valle La Estrella"],"Matina":["Battan","Carrandi","Matina"],"Pococí":["Cariari","Colorado","Guapiles","Jiménez","Rita","Roxana"],"Siquirres":["Alegria","Cairo","Florida","Germania","Pacuarito","Siquirres"],"Talamanca":["Bratsi","Cahuita","Sixaola","Telire"]},"Puntarenas":{"Buenos Aires":["Boruca","Briolley","Brunka","Buenos Aires","Changena","Colinas","Pilas","Potrero Grande","Volcan"],"Corredores":["Canoas","Corredor","La Cuesta","Laurel"],"Coto Brus":["Aguabuena","Limóncito","Pittier","Sabalito","San Vito"],"Esparza":["Espiritu Santo","Macacona","San Jerónimo","San Juan Grande","San Rafael"],"Garabito":["Jacó","Tarcoles"],"Golfito":["Golfito","Guaycara","Pavon","Puerto Jiménez"],"Montes de Oro":["La Unión","Miramar","San Isidro"],"Osa":["Bahia Ballena","Palmar","Piedras Blancas","Puerto Cortes","Sierpe"],"Parrita":["Parrita"],"Puntarenas":["Acapulco","Arancibia","Barranca","Chacarita","Chira","Chomes","Cobano","El Roble","Guacimal","Isla del Coco","Lepanto","Manzanillo","Monte Verde","Paquera","Pitahaya","Puntarenas"],"Quepos":["Naranjito","Quepos","Savegre"]},"San José":{"Acosta":["Cangrejal","Guaitil","Palmichal","Sabanillas","San Ignacio"],"Alajuelita":["Alajuelita","Concepción","San Antonio","San Felipe","San Josecito"],"Aserrí":["Aserrí","Legua","Monterrey","Salitrillos","San Gabriel","Tarbaca","Vuelta de Jorco"],"Curridabat":["Curridabat","Granadilla","Sánchez","Tirrases"],"Desamparados":["Damas","Desamparados","Frailes","Gravilias","Los Guido","Patarrá","Rosario","San Antonio","San Cristóbal","San Juan de Dios","San Miguel","San Rafael Abajo","San Rafael Arriba"],"Dota":["Copey","Jardín","Santa María"],"Escazú":["Escazú","San Antonio","San Rafael"],"Goicoechea":["Calle Blancos","Guadalupe","Ipís","Mata de Plátano","Purral","Rancho Redondo","San Francisco"],"León Cortés Castro":["Llano Bonito","San Andrés","San Antonio","San Isidro","San Pablo","Santa Cruz"],"Montes de Oca":["Mercedes","Sabanilla","San Pedro","San Rafael"],"Mora":["Colón","Guayabo","Jaris","Picagres","Piedras Negras","Tabarcia"],"Moravia":["La Trinidad","San Jerónimo","San Vicente"],"Puriscal":["Barbacoas","Candelarita","Chires","Desamparaditos","Grifo Alto","Mercedes Sur","San Antonio","San Rafael","Santiago"],"Pérez Zeledón":["Barú","Cajón","Daniel Flores","General","Pejibaye","Platanares","Páramo","Rivas","Río Nuevo","San Isidro de El General","San Pedro"],"San José":["Carmen","Catedral","Hatillo","Hospital","Mata Redonda","Merced","Pavas","San Francisco de Dos Ríos","San Sebastián","Uruca","Zapote"],"Santa Ana":["Brasil","Piedades","Pozos","Salitral","Santa Ana","Uruca"],"Tarrazú":["San Carlos","San Lorenzo","San Marcos"],"Tibás":["Anselmo Llorente","Cinco Esquinas","Colima","León XIII","San Juan"],"Turrubares":["Carara","San Juan de Mata","San Luis","San Pablo","San Pedro"],"Vázquez de Coronado":["Cascajal","Dulce Nombre de Jesús","Patalillo","San Isidro","San Rafael"]}};
+
 proj4.defs("EPSG:5367", "+proj=tmerc +lat_0=0 +lon_0=-84 +k=0.9999 +x_0=500000 +y_0=0 +ellps=WGS84 +units=m +no_defs");
 
 const OP_COLORS = {
@@ -230,7 +339,6 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
   attribution:'© OpenStreetMap contributors', maxZoom:19
 }).addTo(map);
 
-const layerGroups = {};
 map.on('mousemove', e=>{
   document.getElementById('wgsVal').textContent = e.latlng.lat.toFixed(5)+', '+e.latlng.lng.toFixed(5);
   try{
@@ -250,9 +358,6 @@ function showState(state){
   errorEl.style.display = state==='error' ? 'flex':'none';
 }
 showState('empty');
-
-let totalLoaded = 0;
-const districtsLoaded = [];
 
 // Primero intenta el proxy propio (Cloudflare Worker): sin límite de tamaño,
 // sin rate-limit compartido con otras apps, y control total. Si por alguna
@@ -312,13 +417,242 @@ function normalizeDistrict(name){
   return name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
 }
 
-async function reverseGeocodeDistrict(lat, lon){
+// --- Emparejamiento difuso contra la lista oficial de distritos (INEC/DTA) ---
+// Nominatim (OpenStreetMap) devuelve nombres de barrios/zonas que no siempre
+// coinciden exactamente con el nombre oficial del distrito que espera ARESEP.
+// En vez de usar ese texto tal cual, lo comparamos contra los 474 distritos
+// oficiales y usamos el más parecido (opcionalmente acotado por el cantón
+// que Nominatim también sugiere), para maximizar la probabilidad de acierto.
+
+function levenshtein(a, b){
+  const m = a.length, n = b.length;
+  if(m===0) return n;
+  if(n===0) return m;
+  let prev = Array.from({length:n+1}, (_,j)=>j);
+  for(let i=1;i<=m;i++){
+    const cur=[i];
+    for(let j=1;j<=n;j++){
+      cur[j] = a[i-1]===b[j-1] ? prev[j-1] : 1+Math.min(prev[j-1],prev[j],cur[j-1]);
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+
+function strSimilarity(a, b){
+  if(!a || !b) return 0;
+  if(a===b) return 1;
+  if(a.includes(b) || b.includes(a)){
+    return 0.82 + 0.15*(Math.min(a.length,b.length)/Math.max(a.length,b.length));
+  }
+  const d = levenshtein(a,b);
+  return 1 - d/Math.max(a.length,b.length);
+}
+
+const DISTRICT_INDEX = [];
+for(const prov in DIVISION_TREE){
+  for(const canton in DIVISION_TREE[prov]){
+    for(const dist of DIVISION_TREE[prov][canton]){
+      DISTRICT_INDEX.push({
+        dist, canton, provincia: prov,
+        distNorm: normalizeDistrict(dist),
+        cantonNorm: normalizeDistrict(canton)
+      });
+    }
+  }
+}
+
+// Busca el distrito oficial más parecido a lo que devolvió el geocodificador.
+// Si hay una pista de cantón, primero acota la búsqueda a ese cantón.
+function findBestDistrict(distGuessRaw, cantonGuessRaw){
+  if(!distGuessRaw && !cantonGuessRaw) return null;
+  const distGuess = distGuessRaw ? normalizeDistrict(distGuessRaw) : '';
+  const cantonGuess = cantonGuessRaw ? normalizeDistrict(cantonGuessRaw) : '';
+
+  let pool = DISTRICT_INDEX;
+  if(cantonGuess){
+    let bestCanton=null, bestCantonScore=0;
+    const seen = new Set();
+    for(const e of DISTRICT_INDEX){
+      if(seen.has(e.cantonNorm)) continue;
+      seen.add(e.cantonNorm);
+      const s = strSimilarity(e.cantonNorm, cantonGuess);
+      if(s>bestCantonScore){ bestCantonScore=s; bestCanton=e.cantonNorm; }
+    }
+    if(bestCanton && bestCantonScore>0.55){
+      pool = DISTRICT_INDEX.filter(e=>e.cantonNorm===bestCanton);
+    }
+  }
+
+  if(!distGuess) return pool[0] || null;
+
+  const exact = pool.find(e=>e.distNorm===distGuess);
+  if(exact) return exact;
+
+  let best=null, bestScore=0;
+  for(const e of pool){
+    const s = strSimilarity(e.distNorm, distGuess);
+    if(s>bestScore){ bestScore=s; best=e; }
+  }
+  if(best && bestScore>=0.5) return best;
+
+  // último recurso: buscar en todo el país, no solo en el cantón sugerido
+  if(pool!==DISTRICT_INDEX){
+    best=null; bestScore=0;
+    for(const e of DISTRICT_INDEX){
+      const s = strSimilarity(e.distNorm, distGuess);
+      if(s>bestScore){ bestScore=s; best=e; }
+    }
+    if(best && bestScore>=0.5) return best;
+  }
+  return null;
+}
+
+async function reverseGeocodeAddress(lat, lon){
   try{
     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=16&addressdetails=1`);
     const data = await res.json();
-    const a = data.address || {};
-    return a.suburb || a.city_district || a.village || a.town || a.municipality || null;
-  }catch(err){ return null; }
+    return data.address || {};
+  }catch(err){ return {}; }
+}
+
+// --- Estado: un "lote" por distrito cargado. Permite cargar/quitar cada
+// distrito de forma independiente (necesario para el árbol de checkboxes),
+// sin perder los demás que estén en el mapa. ---
+const districtBatches = {}; // key: distrito normalizado -> {label, rows, markers}
+const operatorEnabled = {}; // key: operador -> bool (default true)
+
+function isOperatorEnabled(op){ return operatorEnabled[op] !== false; }
+
+function applyMarkerVisibility(){
+  for(const key in districtBatches){
+    for(const m of districtBatches[key].markers){
+      const should = isOperatorEnabled(m._op);
+      const has = map.hasLayer(m);
+      if(should && !has) m.addTo(map);
+      else if(!should && has) map.removeLayer(m);
+    }
+  }
+}
+
+function renderBatch(rows){
+  const markers = [], bounds = [];
+  for(const r of rows){
+    const x = parseFloat(r.coordenadaX), y = parseFloat(r.coordenadaY);
+    if(isNaN(x) || isNaN(y)) continue;
+    const [lon, lat] = proj4('EPSG:5367','WGS84',[x,y]);
+    const op = r.operador || 'N/D';
+    const marker = L.circleMarker([lat,lon],{
+      radius:5, weight:1, color:'#0d1116', fillColor:colorFor(op), fillOpacity:.9
+    }).bindPopup(
+      `<div class="popup-op">${op}</div><div class="popup-loc">${r.distrito||''}, ${r.canton||''}, ${r.provincia||''}</div>`
+    );
+    marker._op = op;
+    if(isOperatorEnabled(op)) marker.addTo(map);
+    markers.push(marker);
+    bounds.push([lat,lon]);
+  }
+  return {markers, bounds};
+}
+
+function rebuildLegend(){
+  const counts = {};
+  for(const batch of Object.values(districtBatches)){
+    for(const r of batch.rows){
+      const op = r.operador || 'N/D';
+      counts[op] = (counts[op]||0)+1;
+    }
+  }
+  const legend = document.getElementById('legend');
+  const list = document.getElementById('legendList');
+  list.innerHTML = '';
+  const ops = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
+  for(const op of ops){
+    const row = document.createElement('label');
+    row.className = 'legend-row';
+    row.innerHTML = `
+      <input type="checkbox" ${isOperatorEnabled(op)?'checked':''}>
+      <span class="swatch" style="background:${colorFor(op)}"></span>
+      <span class="legend-name">${op}</span>
+      <span class="legend-count">${counts[op]}</span>`;
+    row.querySelector('input').addEventListener('change', e=>{
+      operatorEnabled[op] = e.target.checked;
+      applyMarkerVisibility();
+    });
+    list.appendChild(row);
+  }
+  legend.style.display = ops.length ? 'block' : 'none';
+}
+
+function refreshStatus(){
+  const total = Object.values(districtBatches).reduce((s,b)=>s+b.rows.length,0);
+  const labels = Object.values(districtBatches).map(b=>b.label);
+  statusText.textContent = labels.length ? (total + ' postes · ' + labels.join(', ')) : '';
+  const badge = document.getElementById('districtBadge');
+  const n = Object.keys(districtBatches).length;
+  badge.textContent = n;
+  badge.style.display = n ? 'flex' : 'none';
+}
+
+function setTreeChecked(key, checked){
+  document.querySelectorAll('.dp-distrito-row[data-key="'+CSS.escape(key)+'"]').forEach(row=>{
+    row.querySelector('input').checked = checked;
+    row.classList.toggle('active', checked);
+  });
+}
+
+// Carga (si no está ya cargado) los postes de un distrito y los agrega al mapa.
+// Devuelve 'ok' | 'empty' | 'error'.
+async function loadDistrict(distName, opts={}){
+  const key = normalizeDistrict(distName);
+  if(districtBatches[key]){
+    if(opts.fitBounds !== false){
+      const bounds = districtBatches[key].markers.map(m=>m.getLatLng());
+      if(bounds.length) map.fitBounds(bounds, {padding:[30,30]});
+    }
+    return 'ok';
+  }
+
+  const url = 'https://datos.aresep.go.cr/ws.datosabiertos/Services/IE/Electricidad.svc/ObtenerInformacionPostesMapa/'+encodeURIComponent(key);
+  document.getElementById('rawLink').href = url;
+  statusText.textContent = 'Consultando '+(opts.label||distName)+'...';
+  showState(null);
+  try{
+    const json = await fetchJson(url, (attemptUrl)=>{
+      const via = attemptUrl===url ? 'directo' : new URL(attemptUrl).hostname;
+      statusText.textContent = 'Consultando ('+via+')...';
+    });
+    const rows = json.value || [];
+    if(!rows.length){
+      refreshStatus();
+      return 'empty';
+    }
+    const {markers, bounds} = renderBatch(rows);
+    districtBatches[key] = {label: opts.label || distName, rows, markers};
+    rebuildLegend();
+    refreshStatus();
+    setTreeChecked(key, true);
+    if(opts.fitBounds !== false && bounds.length) map.fitBounds(bounds, {padding:[30,30]});
+    return 'ok';
+  }catch(err){
+    refreshStatus();
+    return 'error';
+  }
+}
+
+function unloadDistrict(key){
+  const batch = districtBatches[key];
+  if(!batch) return;
+  for(const m of batch.markers) if(map.hasLayer(m)) map.removeLayer(m);
+  delete districtBatches[key];
+  rebuildLegend();
+  refreshStatus();
+  setTreeChecked(key, false);
+  if(!Object.keys(districtBatches).length) showState('empty');
+}
+
+function clearAllDistricts(){
+  Object.keys(districtBatches).forEach(unloadDistrict);
 }
 
 let searchMarker = null;
@@ -336,26 +670,29 @@ async function goToCoords(lat, lon){
   showState(null);
 
   statusText.textContent = 'Ubicando distrito...';
-  const guess = await reverseGeocodeDistrict(lat, lon);
-  if(!guess){
+  const addr = await reverseGeocodeAddress(lat, lon);
+  const distGuess = addr.suburb || addr.city_district || addr.village || addr.town || addr.quarter || addr.neighbourhood || null;
+  const cantonGuess = addr.county || addr.city || addr.municipality || null;
+
+  if(!distGuess && !cantonGuess){
     statusText.textContent = 'Ubicación: '+lat.toFixed(5)+', '+lon.toFixed(5)+' (no se pudo identificar el distrito)';
     return;
   }
-  const district = normalizeDistrict(guess);
-  statusText.textContent = 'Buscando postes en '+district+'...';
-  const url = 'https://datos.aresep.go.cr/ws.datosabiertos/Services/IE/Electricidad.svc/ObtenerInformacionPostesMapa/'+encodeURIComponent(district);
-  document.getElementById('rawLink').href = url;
-  try{
-    const json = await fetchJson(url);
-    const rows = json.value || [];
-    if(rows.length){
-      addRows(rows, district);
-      map.setView([lat,lon], 15);
-    }else{
-      statusText.textContent = 'Ubicación: '+district+' (sin postes registrados con ese nombre)';
-    }
-  }catch(err){
-    statusText.textContent = 'Ubicación: '+lat.toFixed(5)+', '+lon.toFixed(5)+' — no se pudieron cargar los postes de '+district;
+
+  const match = findBestDistrict(distGuess, cantonGuess);
+  const queryName = match ? match.dist : (distGuess || cantonGuess);
+  const label = match ? `${match.dist} (${match.canton})` : queryName;
+
+  if(!document.getElementById('accumulate').checked) clearAllDistricts();
+
+  statusText.textContent = 'Buscando postes en '+label+'...';
+  const result = await loadDistrict(queryName, {label, fitBounds:false});
+  if(result==='ok'){
+    map.setView([lat,lon], 15);
+  }else if(result==='empty'){
+    statusText.textContent = 'Ubicación: '+label+' (sin postes registrados con ese nombre)';
+  }else{
+    statusText.textContent = 'Ubicación: '+lat.toFixed(5)+', '+lon.toFixed(5)+' — no se pudieron cargar los postes de '+label;
   }
 }
 
@@ -370,97 +707,107 @@ async function search(){
     return;
   }
 
-  const district = raw.toUpperCase();
   btn.disabled = true;
+  if(!document.getElementById('accumulate').checked) clearAllDistricts();
   statusText.textContent = 'Consultando...';
   showState(null);
 
-  const url = 'https://datos.aresep.go.cr/ws.datosabiertos/Services/IE/Electricidad.svc/ObtenerInformacionPostesMapa/'+encodeURIComponent(district);
-  document.getElementById('rawLink').href = url;
-
-  try{
-    const json = await fetchJson(url, (attemptUrl)=>{
-      const via = attemptUrl===url ? 'directo' : new URL(attemptUrl).hostname;
-      statusText.textContent = 'Consultando ('+via+')...';
-    });
-    const rows = json.value || [];
-    if(!rows.length){
-      document.getElementById('errorDetail').textContent = 'La API respondió, pero no hay postes registrados para "'+district+'". Revisá la ortografía del distrito.';
-      showState('error');
-      statusText.textContent = '';
-      btn.disabled = false;
-      return;
-    }
-    addRows(rows, district);
-  }catch(err){
+  const result = await loadDistrict(raw, {label: raw.toUpperCase()});
+  if(result==='empty'){
     document.getElementById('errorDetail').textContent =
-      'La API de ARESEP no respondió, ni directo ni a través de los servicios que evitan el bloqueo entre dominios. Probá de nuevo en un momento.';
+      'La API respondió, pero no hay postes registrados para "'+normalizeDistrict(raw)+'". Revisá la ortografía, o abrí el panel de Distritos (☰) para elegir el nombre oficial exacto.';
     showState('error');
-    statusText.textContent = '';
+  }else if(result==='error'){
+    document.getElementById('errorDetail').textContent =
+      'La API de ARESEP no respondió, ni directo ni a través de los proxies. Probá de nuevo en un momento.';
+    showState('error');
   }
   btn.disabled = false;
 }
 
-function addRows(rows, label){
-  if(!document.getElementById('accumulate').checked){
-    Object.values(layerGroups).forEach(g=>map.removeLayer(g));
-    for(const k in layerGroups) delete layerGroups[k];
-    totalLoaded = 0;
-    districtsLoaded.length = 0;
-    opCounts = {};
+// --- Árbol plegable Provincia > Cantón > Distrito con checkboxes ---
+function buildDistrictTree(){
+  const container = document.getElementById('districtTree');
+  const frag = document.createDocumentFragment();
+  for(const prov of Object.keys(DIVISION_TREE).sort()){
+    const provDetails = document.createElement('details');
+    provDetails.className = 'dp-provincia';
+    const provSummary = document.createElement('summary');
+    provSummary.textContent = prov;
+    provDetails.appendChild(provSummary);
+
+    for(const canton of Object.keys(DIVISION_TREE[prov]).sort()){
+      const cantonDetails = document.createElement('details');
+      cantonDetails.className = 'dp-canton';
+      const cantonSummary = document.createElement('summary');
+      cantonSummary.innerHTML = `<span>${canton}</span><span class="dp-canton-count">${DIVISION_TREE[prov][canton].length}</span>`;
+      cantonDetails.appendChild(cantonSummary);
+
+      for(const dist of DIVISION_TREE[prov][canton]){
+        const key = normalizeDistrict(dist);
+        const row = document.createElement('label');
+        row.className = 'dp-distrito-row';
+        row.dataset.key = key;
+        row.dataset.searchtext = normalizeDistrict(dist+' '+canton+' '+prov);
+        row.innerHTML = `<input type="checkbox" data-key="${key}"><span>${dist}</span>`;
+        row.querySelector('input').addEventListener('change', async (e)=>{
+          const checked = e.target.checked;
+          if(checked){
+            row.classList.add('active');
+            if(!document.getElementById('accumulate').checked) clearAllDistricts();
+            const result = await loadDistrict(dist, {label: `${dist} (${canton})`});
+            if(result!=='ok'){
+              e.target.checked = false;
+              row.classList.remove('active');
+              if(result==='empty') statusText.textContent = 'Sin postes registrados para '+dist+' ('+canton+')';
+            }
+          }else{
+            unloadDistrict(key);
+          }
+        });
+        cantonDetails.appendChild(row);
+      }
+      provDetails.appendChild(cantonDetails);
+    }
+    frag.appendChild(provDetails);
   }
-  render(rows);
-  districtsLoaded.push(label);
-  totalLoaded += rows.length;
-  statusText.textContent = totalLoaded + ' postes · ' + districtsLoaded.join(', ');
+  container.appendChild(frag);
 }
+buildDistrictTree();
 
-let opCounts = {};
+const districtPanel = document.getElementById('districtPanel');
+document.getElementById('districtToggleBtn').addEventListener('click', ()=>{
+  districtPanel.classList.toggle('open');
+});
+document.getElementById('districtCloseBtn').addEventListener('click', ()=>{
+  districtPanel.classList.remove('open');
+});
 
-function render(rows){
-  const bounds = [];
-
-  for(const r of rows){
-    const x = parseFloat(r.coordenadaX), y = parseFloat(r.coordenadaY);
-    if(isNaN(x) || isNaN(y)) continue;
-    const [lon, lat] = proj4('EPSG:5367','WGS84',[x,y]);
-    const op = r.operador || 'N/D';
-    opCounts[op] = (opCounts[op]||0)+1;
-    if(!layerGroups[op]) layerGroups[op] = L.layerGroup().addTo(map);
-
-    L.circleMarker([lat,lon],{
-      radius:5, weight:1, color:'#0d1116', fillColor:colorFor(op), fillOpacity:.9
-    }).bindPopup(
-      `<div class="popup-op">${op}</div><div class="popup-loc">${r.distrito||''}, ${r.canton||''}, ${r.provincia||''}</div>`
-    ).addTo(layerGroups[op]);
-
-    bounds.push([lat,lon]);
+document.getElementById('districtFilter').addEventListener('input', (e)=>{
+  const q = normalizeDistrict(e.target.value.trim());
+  const rows = document.querySelectorAll('.dp-distrito-row');
+  const cantons = document.querySelectorAll('.dp-canton');
+  const provs = document.querySelectorAll('.dp-provincia');
+  if(!q){
+    rows.forEach(r=>r.classList.remove('dp-hidden'));
+    cantons.forEach(c=>{c.classList.remove('dp-hidden'); c.open=false;});
+    provs.forEach(p=>{p.classList.remove('dp-hidden'); p.open=false;});
+    return;
   }
-
-  if(bounds.length) map.fitBounds(bounds,{padding:[30,30]});
-  buildLegend(opCounts);
-}
-
-function buildLegend(counts){
-  const legend = document.getElementById('legend');
-  const list = document.getElementById('legendList');
-  list.innerHTML = '';
-  const ops = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
-  for(const op of ops){
-    const row = document.createElement('label');
-    row.className = 'legend-row';
-    row.innerHTML = `
-      <input type="checkbox" checked>
-      <span class="swatch" style="background:${colorFor(op)}"></span>
-      <span class="legend-name">${op}</span>
-      <span class="legend-count">${counts[op]}</span>`;
-    row.querySelector('input').addEventListener('change', e=>{
-      if(e.target.checked) map.addLayer(layerGroups[op]); else map.removeLayer(layerGroups[op]);
-    });
-    list.appendChild(row);
-  }
-  legend.style.display = ops.length ? 'block' : 'none';
-}
+  rows.forEach(row=>{
+    row.classList.toggle('dp-hidden', !row.dataset.searchtext.includes(q));
+  });
+  cantons.forEach(canton=>{
+    const anyVisible = !!canton.querySelector('.dp-distrito-row:not(.dp-hidden)');
+    canton.classList.toggle('dp-hidden', !anyVisible);
+    canton.open = anyVisible;
+  });
+  provs.forEach(prov=>{
+    const anyVisible = !!prov.querySelector('.dp-canton:not(.dp-hidden)');
+    prov.classList.toggle('dp-hidden', !anyVisible);
+    prov.open = anyVisible;
+  });
+});
 
 btn.addEventListener('click', search);
 input.addEventListener('keydown', e=>{ if(e.key==='Enter') search(); });
