@@ -67,4 +67,4 @@ El sitio se sirve por GitHub Pages directo desde este repositorio. Al modificar 
 
 ## Créditos
 
-Datos: [ARESEP](https://aresep.go.cr/) · Mapas base: © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, © [Esri](https://www.esri.com/)
+Datos: [ARESEP](https://aresep.go.cr/) · Mapas base: © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, © [Esri](https://www.esri.com/) · Desarrollado con [Claude](https://claude.ai) (Claude Pro)
