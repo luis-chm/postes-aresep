@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Postes · ARESEP</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg?v=1">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
@@ -14,7 +15,19 @@
   <header>
     <div class="brand">
       <span class="eyebrow">Datos abiertos</span>
-      <h1>Postes · ARESEP</h1>
+      <h1>
+        <svg class="brand-icon" viewBox="0 0 32 32" width="20" height="20" aria-hidden="true">
+          <line x1="16" y1="5" x2="16" y2="27" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+          <line x1="9" y1="10" x2="23" y2="10" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+          <line x1="10.5" y1="15" x2="21.5" y2="15" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+          <circle cx="16" cy="5" r="1.7" fill="currentColor"/>
+          <circle cx="9" cy="10" r="1.4" fill="currentColor"/>
+          <circle cx="23" cy="10" r="1.4" fill="currentColor"/>
+          <circle cx="10.5" cy="15" r="1.2" fill="currentColor"/>
+          <circle cx="21.5" cy="15" r="1.2" fill="currentColor"/>
+        </svg>
+        Postes · ARESEP
+      </h1>
       <p>Consulta directa a la API, sin pasar por el visor</p>
     </div>
     <div class="search">
@@ -59,6 +72,6 @@
   </main>
 </div>
 
-<script src="js/app.js"></script>
+<script src="js/app.js?v=3"></script>
 </body>
 </html>
