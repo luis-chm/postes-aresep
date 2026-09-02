@@ -15,9 +15,31 @@ function colorFor(op){
 
 const map = L.map('map',{zoomControl:false}).setView([9.75,-84.0],8);
 L.control.zoom({position:'bottomright'}).addTo(map);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+
+const streetLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
   attribution:'© OpenStreetMap contributors', maxZoom:19
-}).addTo(map);
+});
+
+// Vista satelital: imágenes de Esri (gratis, sin API key) + una capa de
+// referencia con nombres de calles/lugares encima, para que siga siendo
+// legible. Es la combinación estándar que usan la mayoría de mapas
+// satelitales (Google Maps, etc. hacen lo mismo con sus propias capas).
+const satelliteImagery = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  { attribution:'Tiles © Esri — Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community', maxZoom:19 }
+);
+const satelliteLabels = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+  { maxZoom:19 }
+);
+const satelliteLayer = L.layerGroup([satelliteImagery, satelliteLabels]);
+
+streetLayer.addTo(map);
+L.control.layers(
+  { 'Calle': streetLayer, 'Satélite': satelliteLayer },
+  null,
+  { position:'topright', collapsed:false }
+).addTo(map);
 
 map.on('mousemove', e=>{
   document.getElementById('wgsVal').textContent = e.latlng.lat.toFixed(5)+', '+e.latlng.lng.toFixed(5);
