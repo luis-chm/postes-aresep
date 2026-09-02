@@ -29,7 +29,7 @@ map.on('mousemove', e=>{
 
 const input = document.getElementById('districtInput');
 const btn = document.getElementById('searchBtn');
-const statusText = document.getElementById('statusText');
+const statusText = document.getElementById('statusSummary');
 const emptyEl = document.getElementById('empty');
 const errorEl = document.getElementById('error');
 
@@ -233,15 +233,46 @@ function rebuildLegend(){
   legend.style.display = ops.length ? 'block' : 'none';
 }
 
+let chipsExpanded = false;
+
 function refreshStatus(){
-  const total = Object.values(districtBatches).reduce((s,b)=>s+b.rows.length,0);
-  const labels = Object.values(districtBatches).map(b=>b.label);
-  statusText.textContent = labels.length ? (total + ' postes · ' + labels.join(', ')) : '';
+  const batches = Object.entries(districtBatches);
+  const total = batches.reduce((s,[,b])=>s+b.rows.length,0);
+  const n = batches.length;
+
+  statusText.textContent = n ? (total.toLocaleString('es-CR') + ' postes · ' + n + (n===1?' distrito':' distritos')) : '';
+
+  const toggle = document.getElementById('statusToggle');
+  const chipsEl = document.getElementById('statusChips');
+  toggle.style.display = n ? 'inline-block' : 'none';
+  if(!n){ chipsExpanded = false; }
+  toggle.textContent = chipsExpanded ? 'ocultar ▴' : 'ver todos ▾';
+
+  chipsEl.innerHTML = '';
+  if(chipsExpanded && n){
+    for(const [key, batch] of batches){
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.innerHTML = `<span>${batch.label}</span>`;
+      const closeBtn = document.createElement('button');
+      closeBtn.textContent = '✕';
+      closeBtn.title = 'Quitar '+batch.label;
+      closeBtn.addEventListener('click', ()=>unloadDistrict(key));
+      chip.appendChild(closeBtn);
+      chipsEl.appendChild(chip);
+    }
+  }
+  chipsEl.style.display = (chipsExpanded && n) ? 'flex' : 'none';
+
   const badge = document.getElementById('districtBadge');
-  const n = Object.keys(districtBatches).length;
   badge.textContent = n;
   badge.style.display = n ? 'flex' : 'none';
 }
+
+document.getElementById('statusToggle').addEventListener('click', ()=>{
+  chipsExpanded = !chipsExpanded;
+  refreshStatus();
+});
 
 function setTreeChecked(key, checked){
   document.querySelectorAll('.dp-distrito-row[data-key="'+CSS.escape(key)+'"]').forEach(row=>{

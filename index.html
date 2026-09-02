@@ -38,7 +38,11 @@
       <button id="districtToggleBtn" class="ghost" title="Explorar por provincia/cantón/distrito">☰ Distritos<span class="dp-badge" id="districtBadge" style="display:none;">0</span></button>
       <button id="themeBtn" class="ghost" title="Cambiar tema">☾ Oscuro</button>
     </div>
-    <div class="status" id="statusText"></div>
+    <div class="status" id="statusBar">
+      <span id="statusSummary"></span>
+      <button id="statusToggle" class="link-btn" style="display:none;">ver todos ▾</button>
+    </div>
+    <div id="statusChips" style="display:none;"></div>
   </header>
   <main>
     <div id="districtPanel">
@@ -53,14 +57,18 @@
     </div>
     <div id="map"></div>
     <div id="empty">
-      <h2>Sin datos cargados</h2>
-      <p>Escribí el nombre de un distrito de Costa Rica (en mayúsculas, tal como aparece en la división territorial) o unas coordenadas WGS84 separadas por coma, y presioná Buscar. Los datos vienen directo de la API de datos abiertos de ARESEP.</p>
-      <span class="hint">ej: EL CARMEN · PAVAS &nbsp;·&nbsp; 9.87034, -84.5884</span>
+      <div class="state-card">
+        <h2>Sin datos cargados</h2>
+        <p>Escribí el nombre de un distrito de Costa Rica (en mayúsculas, tal como aparece en la división territorial) o unas coordenadas WGS84 separadas por coma, y presioná Buscar. Los datos vienen directo de la API de datos abiertos de ARESEP.</p>
+        <span class="hint">ej: EL CARMEN · PAVAS &nbsp;·&nbsp; 9.87034, -84.5884</span>
+      </div>
     </div>
     <div id="error">
-      <h2>No se pudo cargar el distrito</h2>
-      <p id="errorDetail">La API de ARESEP no respondió, o el navegador bloqueó la solicitud entre dominios (CORS).</p>
-      <a id="rawLink" href="#" target="_blank">Abrir los datos crudos en una pestaña nueva ↗</a>
+      <div class="state-card">
+        <h2>No se pudo cargar el distrito</h2>
+        <p id="errorDetail">La API de ARESEP no respondió, o el navegador bloqueó la solicitud entre dominios (CORS).</p>
+        <a id="rawLink" href="#" target="_blank">Abrir los datos crudos en una pestaña nueva ↗</a>
+      </div>
     </div>
     <div class="overlay" id="legend" style="display:none;">
       <h2>Operadores</h2>
@@ -73,6 +81,6 @@
   </main>
 </div>
 
-<script src="js/app.js?v=3"></script>
+<script src="js/app.js?v=4"></script>
 </body>
 </html>
