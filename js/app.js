@@ -14,7 +14,6 @@ function colorFor(op){
 }
 
 const map = L.map('map',{zoomControl:false}).setView([9.75,-84.0],8);
-L.control.zoom({position:'bottomright'}).addTo(map);
 
 const streetLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
   attribution:'© OpenStreetMap contributors', maxZoom:19
@@ -38,8 +37,9 @@ streetLayer.addTo(map);
 L.control.layers(
   { 'Calle': streetLayer, 'Satélite': satelliteLayer },
   null,
-  { position:'topright' }
+  { position:'bottomright' }
 ).addTo(map);
+L.control.zoom({position:'bottomright'}).addTo(map);
 
 // El filtro oscuro (invert/hue-rotate en CSS) está pensado para las
 // calles de OpenStreetMap, que solo vienen en colores claros. No tiene
