@@ -40,7 +40,7 @@
   .search{display:flex;gap:8px;align-items:center;justify-content:center;flex:1;min-width:260px;}
   .search input{
     flex:1;
-    max-width:320px;
+    max-width:500px;
     background:var(--panel-2);
     border:1px solid var(--border);
     color:var(--text);
