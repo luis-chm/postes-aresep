@@ -1,4 +1,4 @@
-  :root{
+:root{
     --bg:#12161b;
     --panel:#181e25;
     --panel-2:#1e2630;
@@ -33,7 +33,8 @@
     text-transform:uppercase;
     color:var(--accent);
   }
-  .brand h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.01em;}
+  .brand h1{font-size:15px;margin:0;font-weight:600;letter-spacing:.01em;display:flex;align-items:center;gap:7px;}
+  .brand-icon{color:var(--accent);flex-shrink:0;}
   .brand p{margin:0;font-size:11px;color:var(--muted);font-family:var(--mono);}
 
   .search{display:flex;gap:8px;align-items:center;flex:1;min-width:260px;}
