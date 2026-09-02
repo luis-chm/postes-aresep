@@ -40,6 +40,7 @@
   .search{display:flex;gap:8px;align-items:center;flex:1;min-width:260px;}
   .search input{
     flex:1;
+    max-width:320px;
     background:var(--panel-2);
     border:1px solid var(--border);
     color:var(--text);
@@ -85,14 +86,6 @@
     min-height:16px;
   }
   #statusSummary{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-
-  #statusChips{
-    flex:1 0 100%;
-    display:none;
-    flex-wrap:wrap;
-    gap:6px;
-    margin-top:8px;
-  }
   .chip{
     display:inline-flex;align-items:center;gap:5px;
     background:var(--panel-2);border:1px solid var(--border);
@@ -251,6 +244,21 @@
     box-sizing:border-box;
   }
   #districtFilter:focus{border-color:var(--accent);}
+
+  .dp-loaded{
+    display:none;
+    flex-wrap:wrap;
+    gap:6px;
+    padding:10px 14px;
+    border-bottom:1px solid var(--border);
+    flex-shrink:0;
+  }
+  .dp-loaded .dp-loaded-label{
+    width:100%;
+    font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+    margin-bottom:2px;
+  }
+
   #districtTree{
     flex:1;
     overflow-y:auto;
