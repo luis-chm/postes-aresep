@@ -272,11 +272,57 @@ function clearAllDistricts(){
   Object.keys(districtBatches).forEach(unloadDistrict);
 }
 
-// --- Búsqueda por coordenada: ya no hace falta adivinar el distrito.
-// Se le pide directo al servicio "todos los postes a X metros de este
-// punto" — es más simple, más rápido, y más preciso (no depende de
-// límites administrativos ni de geocodificación de terceros). ---
-const COORD_SEARCH_RADIUS_M = 500;
+// --- Búsqueda por coordenada: ubica el distrito real donde cae el punto
+// (usando el mismo servicio de ARESEP como referencia geográfica: el
+// distrito del poste más cercano) y carga TODO ese distrito — igual que
+// si lo hubieras escrito a mano o marcado en el árbol. ---
+
+function haversineMeters(lat1, lon1, lat2, lon2){
+  const R = 6371000;
+  const toRad = d => d*Math.PI/180;
+  const dLat = toRad(lat2-lat1);
+  const dLon = toRad(lon2-lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+
+// Consulta liviana (sin paginar) para encontrar postes cercanos y así
+// identificar el distrito/cantón/provincia real del punto. Va ampliando
+// el radio de búsqueda hasta encontrar algo (para zonas con pocos postes).
+async function findDistrictNear(lat, lon){
+  const radii = [500, 2000, 5000, 15000];
+  for(const r of radii){
+    const params = new URLSearchParams({
+      f: 'geojson',
+      outFields: 'nom_distr,nom_cant,nom_prov',
+      outSR: '4326',
+      resultRecordCount: '50',
+      geometry: lon+','+lat,
+      geometryType: 'esriGeometryPoint',
+      inSR: '4326',
+      distance: String(r),
+      units: 'esriSRUnit_Meter',
+      spatialRel: 'esriSpatialRelIntersects'
+    });
+    const url = ARESEP_QUERY_URL + '?' + params.toString();
+    const gj = await fetchArcgisJson(url);
+    if(gj.error) throw new Error(gj.error.message || 'Error de la API de ARESEP');
+    const feats = gj.features || [];
+    if(!feats.length) continue;
+
+    let best=null, bestD=Infinity;
+    for(const f of feats){
+      const c = f.geometry && f.geometry.coordinates;
+      if(!c) continue;
+      const d = haversineMeters(lat, lon, c[1], c[0]);
+      if(d<bestD){ bestD=d; best=f.properties; }
+    }
+    if(best){
+      return { distrito: best.nom_distr, canton: best.nom_cant, provincia: best.nom_prov, distanceM: bestD };
+    }
+  }
+  return null;
+}
 
 let searchMarker = null;
 async function goToCoords(lat, lon){
@@ -285,46 +331,34 @@ async function goToCoords(lat, lon){
     radius:9, weight:2, color:'#fff', fillColor:'#f5c518', fillOpacity:1
   }).addTo(map).bindPopup(
     `<div class="popup-op">Coordenada buscada</div>`+
-    `<div class="popup-loc">${lat.toFixed(5)}, ${lon.toFixed(5)}<br>Radio: ${COORD_SEARCH_RADIUS_M} m</div>`
+    `<div class="popup-loc">${lat.toFixed(5)}, ${lon.toFixed(5)}</div>`
   ).openPopup();
-  map.setView([lat,lon], 16);
+  map.setView([lat,lon], 14);
   showState(null);
 
-  const key = 'COORD:'+lat.toFixed(5)+','+lon.toFixed(5);
-  if(districtBatches[key]) return; // ya está cargado este mismo punto
+  statusText.textContent = 'Ubicando distrito...';
+  let match;
+  try{
+    match = await findDistrictNear(lat, lon);
+  }catch(err){
+    statusText.textContent = 'No se pudo ubicar el distrito de este punto.';
+    return;
+  }
 
+  if(!match){
+    statusText.textContent = 'Ubicación: '+lat.toFixed(5)+', '+lon.toFixed(5)+' (no hay postes registrados cerca)';
+    return;
+  }
+
+  const label = `${match.distrito} (${match.canton})`;
   if(!document.getElementById('accumulate').checked) clearAllDistricts();
 
-  statusText.textContent = 'Buscando postes cerca de este punto...';
-  try{
-    const rows = await arcgisQueryAll({
-      geometry: lon+','+lat,
-      geometryType: 'esriGeometryPoint',
-      inSR: '4326',
-      distance: String(COORD_SEARCH_RADIUS_M),
-      units: 'esriSRUnit_Meter',
-      spatialRel: 'esriSpatialRelIntersects'
-    });
-
-    if(!rows.length){
-      statusText.textContent = 'Sin postes registrados a menos de '+COORD_SEARCH_RADIUS_M+' m de este punto.';
-      return;
-    }
-
-    // Etiqueta amigable: el distrito más frecuente entre los resultados
-    const freq = {};
-    for(const r of rows) freq[r.distrito] = (freq[r.distrito]||0)+1;
-    const topDist = Object.keys(freq).sort((a,b)=>freq[b]-freq[a])[0];
-    const sample = rows.find(r=>r.distrito===topDist);
-    const label = `${topDist}${sample.canton ? ' ('+sample.canton+')' : ''} — cerca de ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
-
-    const {markers, bounds} = renderBatch(rows);
-    districtBatches[key] = {label, rows, markers};
-    rebuildLegend();
-    refreshStatus();
-    if(bounds.length) map.fitBounds(bounds, {padding:[40,40]});
-  }catch(err){
-    statusText.textContent = 'No se pudieron cargar los postes cerca de este punto.';
+  statusText.textContent = 'Cargando distrito '+label+'...';
+  const result = await loadDistrict(match.distrito, {label});
+  if(result==='empty'){
+    statusText.textContent = 'Ubicación: '+label+' (sin postes registrados con ese nombre)';
+  }else if(result==='error'){
+    statusText.textContent = 'No se pudieron cargar los postes de '+label;
   }
 }
 
