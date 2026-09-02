@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/31760250/README.md)
 # Postes · ARESEP
 
 Visor de postes eléctricos de Costa Rica, con datos abiertos directos de ARESEP (Autoridad Reguladora de los Servicios Públicos). Permite ubicar los postes por distrito, por coordenada, o navegando un árbol de provincia → cantón → distrito, sin pasar por el visor oficial.
