@@ -270,18 +270,24 @@ function refreshStatus(){
 
   statusText.textContent = n ? (total.toLocaleString('es-CR') + ' postes · ' + n + (n===1?' distrito':' distritos')) : '';
 
-  const chipsEl = document.getElementById('statusChips');
+  const chipsEl = document.getElementById('loadedChips');
   chipsEl.innerHTML = '';
-  for(const [key, batch] of batches){
-    const chip = document.createElement('span');
-    chip.className = 'chip';
-    chip.innerHTML = `<span>${batch.label}</span>`;
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = '✕';
-    closeBtn.title = 'Quitar '+batch.label;
-    closeBtn.addEventListener('click', ()=>unloadDistrict(key));
-    chip.appendChild(closeBtn);
-    chipsEl.appendChild(chip);
+  if(n){
+    const label = document.createElement('span');
+    label.className = 'dp-loaded-label';
+    label.textContent = 'Cargados';
+    chipsEl.appendChild(label);
+    for(const [key, batch] of batches){
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.innerHTML = `<span>${batch.label}</span>`;
+      const closeBtn = document.createElement('button');
+      closeBtn.textContent = '✕';
+      closeBtn.title = 'Quitar '+batch.label;
+      closeBtn.addEventListener('click', ()=>unloadDistrict(key));
+      chip.appendChild(closeBtn);
+      chipsEl.appendChild(chip);
+    }
   }
   chipsEl.style.display = n ? 'flex' : 'none';
 
