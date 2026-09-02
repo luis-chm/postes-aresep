@@ -45,8 +45,19 @@ function tryParseCoords(str){
   return [parseFloat(m[1]), parseFloat(m[2])];
 }
 
+// Quita tildes (á→a, é→e, etc.) pero preserva la ñ/Ñ, que es una letra
+// aparte del español, no una vocal acentuada — ARESEP la guarda tal cual
+// (ej. "CAÑAS", "CUREÑA") y una normalización genérica por Unicode (NFD)
+// la convierte por error en "n", rompiendo la búsqueda de esos distritos.
+const ACCENT_MAP = {
+  'Á':'A','À':'A','Ä':'A','Â':'A',
+  'É':'E','È':'E','Ë':'E','Ê':'E',
+  'Í':'I','Ì':'I','Ï':'I','Î':'I',
+  'Ó':'O','Ò':'O','Ö':'O','Ô':'O',
+  'Ú':'U','Ù':'U','Ü':'U','Û':'U'
+};
 function normalizeDistrict(name){
-  return name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+  return name.toUpperCase().split('').map(c => ACCENT_MAP[c] || c).join('').trim();
 }
 
 // Se carga de forma asíncrona en init() desde data/division-tree.json,
