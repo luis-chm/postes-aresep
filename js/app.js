@@ -38,8 +38,16 @@ streetLayer.addTo(map);
 L.control.layers(
   { 'Calle': streetLayer, 'Satélite': satelliteLayer },
   null,
-  { position:'topright', collapsed:false }
+  { position:'topright' }
 ).addTo(map);
+
+// El filtro oscuro (invert/hue-rotate en CSS) está pensado para las
+// calles de OpenStreetMap, que solo vienen en colores claros. No tiene
+// sentido aplicárselo a la foto satelital — se ve con colores raros.
+// Esta clase le dice al CSS cuándo desactivar ese filtro.
+map.on('baselayerchange', e=>{
+  document.getElementById('map').classList.toggle('satellite-active', e.name === 'Satélite');
+});
 
 map.on('mousemove', e=>{
   document.getElementById('wgsVal').textContent = e.latlng.lat.toFixed(5)+', '+e.latlng.lng.toFixed(5);
