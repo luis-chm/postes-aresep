@@ -46,9 +46,14 @@ function tryParseCoords(str){
 }
 
 // Quita tildes (á→a, é→e, etc.) pero preserva la ñ/Ñ, que es una letra
-// aparte del español, no una vocal acentuada — ARESEP la guarda tal cual
-// (ej. "CAÑAS", "CUREÑA") y una normalización genérica por Unicode (NFD)
-// la convierte por error en "n", rompiendo la búsqueda de esos distritos.
+// aparte del español, no una vocal acentuada. Esto es SOLO para uso
+// interno (claves de districtBatches, sincronizar el árbol, filtro de
+// búsqueda) — para que "guacima" y "GUÁCIMA" se traten como lo mismo.
+// NUNCA se usa para armar la consulta a la API: ARESEP guarda los
+// nombres de distrito CON tildes tal como corresponde ortográficamente
+// (ej. "GUÁCIMA", "SAN JOSÉ", "CONCEPCIÓN"), así que la consulta necesita
+// el nombre oficial completo, tildes incluidas — ver OFFICIAL_NAME_BY_KEY
+// más abajo.
 const ACCENT_MAP = {
   'Á':'A','À':'A','Ä':'A','Â':'A',
   'É':'E','È':'E','Ë':'E','Ê':'E',
@@ -58,6 +63,20 @@ const ACCENT_MAP = {
 };
 function normalizeDistrict(name){
   return name.toUpperCase().split('').map(c => ACCENT_MAP[c] || c).join('').trim();
+}
+
+// Traduce una clave sin tildes (ej. "GUACIMA") al nombre oficial con
+// tildes (ej. "Guácima"), usando el árbol de distritos como fuente de
+// verdad. Se llena en init() apenas se carga DIVISION_TREE.
+const OFFICIAL_NAME_BY_KEY = {};
+function buildOfficialNameIndex(){
+  for(const prov in DIVISION_TREE){
+    for(const canton in DIVISION_TREE[prov]){
+      for(const dist of DIVISION_TREE[prov][canton]){
+        OFFICIAL_NAME_BY_KEY[normalizeDistrict(dist)] = dist;
+      }
+    }
+  }
 }
 
 // Se carga de forma asíncrona en init() desde data/division-tree.json,
@@ -246,7 +265,12 @@ async function loadDistrict(distName, opts={}){
   statusText.textContent = 'Consultando '+(opts.label||distName)+'...';
   showState(null);
   try{
-    const safeName = key.replace(/'/g, "''"); // por si algún nombre trajera comillas
+    // Para la consulta hay que usar el nombre CON tildes tal como lo
+    // tiene la base de datos de ARESEP. Si conocemos el nombre oficial
+    // (por el árbol de distritos), lo usamos aunque el usuario haya
+    // escrito sin tildes; si no lo conocemos, usamos tal cual se escribió.
+    const queryValue = (OFFICIAL_NAME_BY_KEY[key] || distName).toUpperCase();
+    const safeName = queryValue.replace(/'/g, "''"); // por si algún nombre trajera comillas
     const rows = await arcgisQueryAll(
       { where: `nom_distr='${safeName}'` },
       (n)=>{ if(n) statusText.textContent = 'Consultando '+(opts.label||distName)+'... ('+n+' postes)'; }
@@ -503,6 +527,7 @@ async function init(){
     const res = await fetch('data/division-tree.json');
     if(!res.ok) throw new Error('HTTP error');
     DIVISION_TREE = await res.json();
+    buildOfficialNameIndex();
     buildDistrictTree();
     statusText.textContent = '';
   }catch(err){
