@@ -64,6 +64,12 @@ const ARESEP_QUERY_URL = 'https://mapas.aresep.go.cr/server/rest/services/I_Ener
 const PAGE_SIZE = 1500; // límite del servicio (MaxRecordCount)
 const MAX_PAGES = 40;   // salvaguarda (60,000 postes como máximo por consulta)
 
+// Respaldo: tu propio proxy en Cloudflare Workers. El acceso directo ya
+// funciona (CORS lo permite), así que este solo se usa si la petición
+// directa falla — por un bloqueo temporal del firewall de ARESEP, un
+// cambio futuro en su política CORS, o una caída puntual del servicio.
+const MY_WORKER = 'https://postes-aresep-proxy.luischavesmora.workers.dev/';
+
 async function fetchWithTimeout(url, ms){
   const ctrl = new AbortController();
   const t = setTimeout(()=>ctrl.abort(), ms);
@@ -71,6 +77,22 @@ async function fetchWithTimeout(url, ms){
     return await fetch(url, {signal: ctrl.signal});
   }finally{
     clearTimeout(t);
+  }
+}
+
+// Intenta la petición directa; si falla por cualquier motivo (red, CORS,
+// bloqueo del WAF, respuesta que no es JSON válido), reintenta a través
+// del proxy propio antes de darse por vencido.
+async function fetchArcgisJson(url){
+  try{
+    const res = await fetchWithTimeout(url, 15000);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    return await res.json(); // si el WAF devolvió HTML, esto lanza y cae al catch
+  }catch(directErr){
+    const proxied = MY_WORKER + '?url=' + encodeURIComponent(url);
+    const res = await fetchWithTimeout(proxied, 15000);
+    if(!res.ok) throw directErr;
+    return await res.json();
   }
 }
 
@@ -92,9 +114,7 @@ async function arcgisQueryAll(extraParams, onProgress){
     if(page===0) document.getElementById('rawLink').href = url;
     if(onProgress) onProgress(rows.length);
 
-    const res = await fetchWithTimeout(url, 15000);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const gj = await res.json();
+    const gj = await fetchArcgisJson(url);
     if(gj.error) throw new Error(gj.error.message || 'Error de la API de ARESEP');
 
     const feats = gj.features || [];
@@ -217,7 +237,7 @@ async function loadDistrict(distName, opts={}){
   try{
     const safeName = key.replace(/'/g, "''"); // por si algún nombre trajera comillas
     const rows = await arcgisQueryAll(
-      { where: `UPPER(nom_distr)='${safeName}'` },
+      { where: `nom_distr='${safeName}'` },
       (n)=>{ if(n) statusText.textContent = 'Consultando '+(opts.label||distName)+'... ('+n+' postes)'; }
     );
     if(!rows.length){
