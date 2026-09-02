@@ -1,4 +1,4 @@
-  :root{
+:root{
     --bg:#12161b;
     --panel:#181e25;
     --panel-2:#1e2630;
@@ -126,6 +126,7 @@
   #map .leaflet-tile-pane{
     filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9) saturate(0.6);
   }
+  #map.satellite-active .leaflet-tile-pane{ filter:none; }
 
   .overlay{
     position:absolute;
