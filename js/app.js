@@ -627,6 +627,12 @@ document.getElementById('concessionToggle').addEventListener('change', e=>{
   toggleConcessionZones(e.target.checked);
 });
 
+document.querySelectorAll('.state-close').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.getElementById(btn.dataset.target).style.display = 'none';
+  });
+});
+
 const themeBtn = document.getElementById('themeBtn');
 themeBtn.addEventListener('click', ()=>{
   const light = document.body.classList.toggle('light');
