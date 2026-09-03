@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
-<link rel="stylesheet" href="css/style.css?v=5">
+<link rel="stylesheet" href="css/style.css?v=6">
 </head>
 <body>
 <div id="app">
@@ -27,13 +27,14 @@
           <circle cx="10.5" cy="15" r="1.2" fill="currentColor"/>
           <circle cx="21.5" cy="15" r="1.2" fill="currentColor"/>
         </svg>
-        Postes · ARESEP · v4.3.1
+        Postes · ARESEP · v4.4
       </h1>
     </div>
     <div class="search">
       <input id="districtInput" type="text" placeholder="Distrito (EL CARMEN) o coordenadas WGS84 (9.87034, -84.5884)" autocomplete="off">
       <button id="searchBtn">Buscar postes</button>
       <label class="accumulate"><input type="checkbox" id="accumulate"> agregar al mapa</label>
+      <label class="accumulate"><input type="checkbox" id="concessionToggle"> zonas de concesión</label>
       <button id="districtToggleBtn" class="ghost" title="Explorar por provincia/cantón/distrito">☰ Distritos<span class="dp-badge" id="districtBadge" style="display:none;">0</span></button>
       <button id="themeBtn" class="ghost" title="Cambiar tema">☾ Oscuro</button>
     </div>
@@ -79,6 +80,6 @@
   </main>
 </div>
 
-<script src="js/app.js?v=9"></script>
+<script src="js/app.js?v=10"></script>
 </body>
 </html>
