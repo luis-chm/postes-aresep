@@ -5,10 +5,15 @@ proj4.defs("EPSG:5367", "+proj=tmerc +lat_0=0 +lon_0=-84 +k=0.9999 +x_0=500000 +
 const OP_COLORS = {
   ICE: '#f5c518', CNFL: '#e8833a', COOPELESCA: '#4caf6d',
   COOPEGUANACASTE: '#1fb6a8', JASEC: '#4c8df5', COOPESANTOS: '#7fd1e0',
-  ESPH: '#a76cf2', COOPEALFARORUIZ: '#e15fb0'
+  ESPH: '#a76cf2', COOPEALFARORUIZ: '#e15fb0', 'ZONA EN BLANCO': '#555555'
 };
 function colorFor(op){
   if(OP_COLORS[op]) return OP_COLORS[op];
+  // algunos datasets de ARESEP usan variantes del nombre (ej. "COOPEGUANACASTE R.L."
+  // en vez de "COOPEGUANACASTE") — probamos coincidencia por prefijo antes de
+  // caer al color aleatorio por hash.
+  const key = Object.keys(OP_COLORS).find(k => op.startsWith(k));
+  if(key) return OP_COLORS[key];
   let h=0; for(const c of op) h=(h*31+c.charCodeAt(0))%360;
   return `hsl(${h},65%,60%)`;
 }
@@ -121,6 +126,10 @@ let DIVISION_TREE = {};
 // proj4 para los datos) y soporta consultas por distancia a un punto, lo
 // que evita tener que adivinar en qué distrito cae una coordenada.
 const ARESEP_QUERY_URL = 'https://mapas.aresep.go.cr/server/rest/services/I_Energia_Externo_PII/I_Energia_Externo_Post_Transf_PII/MapServer/0/query';
+// Zonas de concesión por operador eléctrico — mismo servidor de ARESEP,
+// capa de polígonos (id=2) en vez de postes. También publicada en 2019 y
+// nunca actualizada desde entonces, igual que los postes.
+const CONCESSION_QUERY_URL = 'https://mapas.aresep.go.cr/server/rest/services/I_Energia_Externo_PII/I_Energia_Externo_PII/MapServer/2/query';
 const PAGE_SIZE = 1500; // límite del servicio (MaxRecordCount)
 const MAX_PAGES = 40;   // salvaguarda (60,000 postes como máximo por consulta)
 
@@ -156,7 +165,56 @@ async function fetchArcgisJson(url){
   }
 }
 
-// Trae TODAS las filas de una consulta, paginando automáticamente si el
+// --- Zonas de concesión por operador (overlay de polígonos) ---
+// Se carga una sola vez (son pocas decenas de polígonos, cabe en una
+// consulta) y se agrega/quita del mapa con el checkbox correspondiente.
+let concessionLayer = null;
+
+async function toggleConcessionZones(show){
+  if(!show){
+    if(concessionLayer) map.removeLayer(concessionLayer);
+    return;
+  }
+  if(concessionLayer){
+    concessionLayer.addTo(map);
+    concessionLayer.bringToBack();
+    return;
+  }
+  const params = new URLSearchParams({
+    f: 'geojson',
+    outFields: 'OPERADOR,DESCRIPCION,AREAKM',
+    outSR: '4326',
+    where: '1=1',
+    resultRecordCount: '2000'
+  });
+  const url = CONCESSION_QUERY_URL + '?' + params.toString();
+  try{
+    const gj = await fetchArcgisJson(url);
+    if(gj.error) throw new Error(gj.error.message || 'Error de la API de ARESEP');
+    concessionLayer = L.geoJSON(gj, {
+      style: feature => ({
+        color: '#666',
+        weight: 1,
+        fillColor: colorFor(feature.properties.OPERADOR || ''),
+        fillOpacity: 0.22
+      }),
+      onEachFeature: (feature, layer) => {
+        const p = feature.properties;
+        const area = p.AREAKM ? Math.round(p.AREAKM).toLocaleString('es-CR')+' km²' : '';
+        layer.bindPopup(
+          `<div class="popup-op">${p.OPERADOR || 'Sin operador'}</div>`+
+          `<div class="popup-loc">${p.DESCRIPCION || ''}${area ? ' · '+area : ''}</div>`
+        );
+      }
+    }).addTo(map);
+    concessionLayer.bringToBack();
+  }catch(err){
+    document.getElementById('concessionToggle').checked = false;
+    statusText.textContent = 'No se pudieron cargar las zonas de concesión.';
+  }
+}
+
+
 // servicio corta la respuesta (exceededTransferLimit).
 async function arcgisQueryAll(extraParams, onProgress){
   const rows = [];
@@ -564,6 +622,10 @@ document.getElementById('districtFilter').addEventListener('input', (e)=>{
 
 btn.addEventListener('click', search);
 input.addEventListener('keydown', e=>{ if(e.key==='Enter') search(); });
+
+document.getElementById('concessionToggle').addEventListener('change', e=>{
+  toggleConcessionZones(e.target.checked);
+});
 
 const themeBtn = document.getElementById('themeBtn');
 themeBtn.addEventListener('click', ()=>{
